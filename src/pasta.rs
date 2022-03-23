@@ -1,12 +1,11 @@
 //! This module implements the Nova traits for pallas::Point and pallas::Scalar.
 use crate::traits::{ChallengeTrait, CompressedGroup, Group, PrimeField};
 use merlin::Transcript;
-use pasta_curves::arithmetic::{CurveExt, FieldExt, Group as Grp};
-use pasta_curves::group::GroupEncoding;
-use pasta_curves::{self, pallas, Ep, Fq};
+use pasta_curves::arithmetic::{CurveExt, FieldExt};
+use pasta_curves::group::{Curve, GroupEncoding};
+use pasta_curves::{self, pallas, Ep, EpAffine, Fq};
 use rand::{CryptoRng, RngCore};
 use std::borrow::Borrow;
-use std::ops::Mul;
 
 impl Group for pallas::Point {
   type Scalar = pallas::Scalar;
@@ -20,12 +19,15 @@ impl Group for pallas::Point {
     J::Item: Borrow<Self>,
     Self: Clone,
   {
-    // Unoptimized.
-    scalars
+    let s = scalars
       .into_iter()
-      .zip(points)
-      .map(|(scalar, point)| (*point.borrow()).mul(*scalar.borrow()))
-      .fold(Ep::group_zero(), |acc, x| acc + x)
+      .map(|x| x.borrow().clone())
+      .collect::<Vec<Self::Scalar>>();
+    let p = points
+      .into_iter()
+      .map(|x| x.borrow().clone().to_affine())
+      .collect::<Vec<EpAffine>>();
+    pasta_msm::multi_scalar_mult(&p, &s)
   }
 
   fn compress(&self) -> Self::CompressedGroupElement {
